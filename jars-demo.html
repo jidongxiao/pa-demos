@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics-Based Poll - The Jar of Opinions</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EY04EPSP2B"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-EY04EPSP2B');
+</script>
+  <link rel="icon" type="image/x-icon" href="/favicons/PresentationAssistantsWhite.ico">
+    <style>
+        /* Basic page styling */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            color: #333;
+            overflow: hidden; /* Hide scrollbars */
+        }
+
+        /* Header and controls styling */
+        .header {
+            width: 100%;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+        }
+        
+        .controls button {
+            font-size: 16px;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            font-weight: 500;
+        }
+
+        .controls button:active {
+            transform: scale(0.95);
+        }
+
+        #btnA { background-color: #4285F4; color: white; }
+        #btnB { background-color: #34A853; color: white; }
+        #btnC { background-color: #FBBC05; color: white; }
+
+        /* Canvas container that holds the physics world */
+        #canvas-container {
+            width: 100%;
+            flex-grow: 1; /* Take up remaining vertical space */
+            position: relative; /* For positioning labels */
+        }
+
+        /* Jar labels */
+        .jar-label {
+            position: absolute;
+            bottom: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #5f6368;
+            user-select: none; /* Make text unselectable */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Which feature should we build next?</h1>
+        <div class="controls">
+            <button id="btnA">Vote for Feature A</button>
+            <button id="btnB">Vote for Feature B</button>
+            <button id="btnC">Vote for Feature C</button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+    <script>
+        // --- Matter.js Module Aliases ---
+        const { Engine, Render, Runner, World, Bodies, Body, Composite, Mouse, MouseConstraint } = Matter;
+
+        // --- Basic Setup ---
+        const container = document.getElementById('canvas-container');
+        const worldWidth = container.clientWidth;
+        const worldHeight = container.clientHeight;
+
+        // Create engine and renderer
+        const engine = Engine.create();
+        const world = engine.world;
+        const render = Render.create({
+            element: container,
+            engine: engine,
+            options: {
+                width: worldWidth,
+                height: worldHeight,
+                wireframes: false, // Render solid shapes, not outlines
+                background: 'transparent' // Transparent canvas to see page bg
+            }
+        });
+
+        // --- Jar and Marble Properties ---
+        const jarWidth = 200;
+        const jarHeight = 300;
+        const jarThickness = 20;
+        const marbleRadius = 10;
+        const jarY = worldHeight - (jarHeight / 2); // Center jar vertically from bottom
+
+        const jarColors = {
+            A: '#4285F4', // Blue
+            B: '#34A853', // Green
+            C: '#FBBC05'  // Yellow
+        };
+        
+        // --- Create Jars ---
+        // A jar is a "composite" body made of a floor and two walls, so it can be grabbed and moved as one piece.
+        function createJar(x, label) {
+            const floor = Bodies.rectangle(x, jarY + jarHeight / 2 - jarThickness / 2, jarWidth, jarThickness, { isStatic: true });
+            const leftWall = Bodies.rectangle(x - jarWidth / 2 + jarThickness / 2, jarY, jarThickness, jarHeight, { isStatic: true });
+            const rightWall = Bodies.rectangle(x + jarWidth / 2 - jarThickness / 2, jarY, jarThickness, jarHeight, { isStatic: true });
+
+            // Group the parts into a single composite body
+            const jarComposite = Composite.create({
+                label: `Jar ${label}`,
+                bodies: [floor, leftWall, rightWall]
+            });
+
+            // Make the composite body interactive by replacing it with a single, movable body
+            // This is a more advanced technique to make the whole jar draggable.
+            const jarBody = Body.create({
+                parts: [floor, leftWall, rightWall],
+                isStatic: true, // Allow it to be moved by the mouse
+                friction: 0.9,
+                restitution: 0.1
+            });
+            
+            // Add a text label below the jar
+            const labelElement = document.createElement('div');
+            labelElement.className = 'jar-label';
+            labelElement.innerText = label;
+            labelElement.style.left = `${x - 10}px`; // Adjust positioning
+            container.appendChild(labelElement);
+
+            return jarBody;
+        }
+
+        const jarSpacing = worldWidth / 4;
+        const jarA = createJar(jarSpacing * 1, 'A');
+        const jarB = createJar(jarSpacing * 2, 'B');
+        const jarC = createJar(jarSpacing * 3, 'C');
+
+        // Add jars and an invisible ground to the world
+        const ground = Bodies.rectangle(worldWidth / 2, worldHeight + 30, worldWidth, 60, { isStatic: true }); // Catch any stray marbles
+        World.add(world, [ground, jarA, jarB, jarC]);
+
+
+        // --- Create Marbles (The Votes) ---
+        function addMarble(jarLetter) {
+            let xPosition;
+            if (jarLetter === 'A') xPosition = jarSpacing * 1;
+            if (jarLetter === 'B') xPosition = jarSpacing * 2;
+            if (jarLetter === 'C') xPosition = jarSpacing * 3;
+            
+            // Add a little randomness to the drop position
+            xPosition += (Math.random() - 0.5) * 50;
+
+            const marble = Bodies.circle(xPosition, 50, marbleRadius, {
+                restitution: 0.5, // Bounciness
+                friction: 0.5,
+                density: 0.01,
+                render: {
+                    fillStyle: jarColors[jarLetter]
+                }
+            });
+            World.add(world, marble);
+        }
+
+        // --- Mouse Interaction ---
+        // Add mouse control to allow users to grab and move objects
+        const mouse = Mouse.create(render.canvas);
+        const mouseConstraint = MouseConstraint.create(engine, {
+            mouse: mouse,
+            constraint: {
+                stiffness: 0.2,
+                render: {
+                    visible: false // Don't show the grab line
+                }
+            }
+        });
+        World.add(world, mouseConstraint);
+        render.mouse = mouse; // Keep the renderer aware of the mouse
+
+        // --- Event Listeners For Buttons ---
+        document.getElementById('btnA').addEventListener('click', () => addMarble('A'));
+        document.getElementById('btnB').addEventListener('click', () => addMarble('B'));
+        document.getElementById('btnC').addEventListener('click', () => addMarble('C'));
+
+        // --- Run the Simulation ---
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+    </script>
+</body>
+</html>

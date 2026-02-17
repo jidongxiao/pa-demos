@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Interleaved Multi-Track Timeline (Editable & Draggable)</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EY04EPSP2B"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-EY04EPSP2B');
+</script>
+  <link rel="icon" type="image/x-icon" href="/favicons/PresentationAssistantsWhite.ico">
+<style>
+  :root{
+    --bg:#0b1220; --panel:#0f1724; --accent:#7c3aed; --accent2:#06b6d4;
+    --muted:#9fb0cc; --card:#0b1520; --glass: rgba(255,255,255,0.02);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  }
+body {
+  margin: 0;
+  min-height: 100vh; 
+  background: linear-gradient(180deg,#071022 0%, #0b1220 100%);
+  color: #e6eef8; 
+  padding: 20px; 
+  -webkit-font-smoothing: antialiased;
+  /* allow body to grow */
+  height: auto;
+}
+
+  .wrap{ max-width:1200px; margin:0 auto; }
+  header{ display:flex; gap:16px; align-items:center; margin-bottom:14px; }
+  .logo{ width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700}
+  h1{ margin:0; font-size:18px }
+  p.lead{ margin:0; color:var(--muted); font-size:13px }
+  .controls{ margin-left:auto; display:flex; gap:8px; align-items:center }
+  .btn{ background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.02); padding:8px 10px; border-radius:8px; color:inherit; cursor:pointer; font-weight:600 }
+  .btn.secondary{ background:transparent; color:var(--muted) }
+
+  .timeline-area{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns: 140px 1fr;
+    gap:12px;
+    align-items:stretch;
+    min-height:600px;
+  }
+.time-axis { position:relative; color:var(--muted); font-size:13px; padding-top:20px; }
+.time-axis,
+#tracksView {
+  height: 100%;
+}
+.axis-line {
+  position: absolute;
+  left: 80px;
+  width: 2px;
+  background: linear-gradient(180deg,var(--accent),var(--accent2));
+  border-radius: 4px;
+  margin-left: -1px;
+}
+.tracks-view {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+  border-radius: 12px;
+  overflow: visible;
+  box-shadow: 0 12px 40px rgba(3,6,18,0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.tracks-header,
+.tracks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+}
+
+.tracks { 
+  /* Remove padding */
+  display: grid;
+  gap: 6px;
+  position: relative;
+  height: 100%;
+}
+
+.hover-container {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.track-column:hover .hover-container {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.track-column {
+  padding-left: 8px; 
+  padding-right: 8px;
+  height: calc(var(--timeline-height));
+  border-radius: 8px;
+  border: 1px dashed rgba(255,255,255,0.02);
+  background: linear-gradient(180deg, rgba(255,255,255,0.005), transparent);
+}
+.track-separator {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: #888;
+  margin-top: 40px; /* same height as hover container */
+}
+
+.track-title {
+  padding: 8px 4px; /* reduce padding so titles fit in the grid exactly */
+  min-width: 0; /* remove fixed min-width */
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:8px; font-weight:700; font-size:13px; color:var(--muted); text-align:center;
+}
+  .event { position:absolute; left:8px; right:8px; background: linear-gradient(180deg, rgba(124,58,237,0.12), rgba(6,182,212,0.06)); border-radius:8px; padding:8px 10px; color:#fff; box-shadow: 0 8px 20px rgba(3,6,18,0.6); border:1px solid rgba(255,255,255,0.03); font-size:13px; cursor:grab; overflow:hidden; }
+  .event:active{ cursor:grabbing }
+  .event .title{ font-weight:700; font-size:13px; margin-bottom:4px; }
+  .event .meta{ font-size:12px; color:rgba(230,238,248,0.8); margin-bottom:6px }
+  .event .text{ font-size:12px; color:var(--muted); line-height:1.2 }
+  .time-label { position:absolute; left:12px; transform:translateY(-50%); font-size:12px; color:var(--muted) }
+
+ .modal {
+    position: fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.5);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+  }
+
+.modal-content {
+  background: #222;
+  color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal input {
+  width: 100%;
+  padding: 4px 8px;
+  margin-top: 4px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #333;
+  color: #fff;
+}
+
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<div class="wrap">
+  <header>
+    <div class="logo">TL</div>
+    <div>
+      <h1>Interleaved Multi-Track Timeline</h1>
+      <p class="lead">True time axis with multiple tracks — draggable & editable events.</p>
+    </div>
+    <div class="controls" role="toolbar">
+      <button class="btn" id="zoomIn">Zoom In</button>
+      <button class="btn" id="zoomOut">Zoom Out</button>
+      <button class="btn secondary" id="resetZoom">Reset</button>
+      <button class="btn secondary" id="setTimeLabels">Set Time Labels</button>
+    </div>
+  </header>
+
+  <section class="timeline-area" aria-label="Timeline">
+    <aside class="time-axis" id="timeAxis" aria-hidden="false">
+      <div class="axis-line" id="axisLine"></div>
+    </aside>
+
+    <div class="tracks-view" id="tracksView">
+      <div class="tracks-header" id="tracksHeader"></div>
+      <div class="tracks" id="tracksGrid"></div>
+    </div>
+  </section>
+</div>
+
+<div id="editEventModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <span id="closeEditModal" style="position:absolute; top:8px; right:12px; cursor:pointer;">&times;</span>
+    <h2>Edit Event</h2>
+
+    <label>
+      Title
+      <input type="text" id="editEventTitle">
+    </label>
+
+    <label>
+      Start
+      <input type="number" id="editEventStart">
+    </label>
+
+    <label>
+      End
+      <input type="number" id="editEventEnd">
+    </label>
+
+    <label>
+      Text
+      <textarea id="editEventText" rows="3"></textarea>
+    </label>
+
+    <div class="modal-buttons">
+      <button id="saveEditEventBtn">Save</button>
+      <button id="cancelEditEventBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="timeLabelsModal" style="display:none;">
+  <div class="modal-content">
+    <h2>Set Time Labels</h2>
+    <label>
+      Start Value:
+      <input type="number" id="timeStart" value="0">
+    </label>
+    <label>
+      End Value:
+      <input type="number" id="timeEnd" value="100">
+    </label>
+    <label>
+      Step Size:
+      <input type="number" id="timeStep" value="10">
+    </label>
+    <div class="modal-buttons">
+      <button id="timeLabelsApply">Apply</button>
+      <button id="timeLabelsCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Tracks now have a unique id
+let nextTrackId = 5; // next ID to assign for new tracks
+const tracks = [
+  { id: 1, name: 'Packet Handler' },
+  { id: 2, name: 'Firewall' },
+  { id: 3, name: 'Disk IO' },
+  { id: 4, name: 'Monitoring' }
+];
+
+// Events refer to trackId instead of track name
+const events = [
+  { trackId: 1, start: 0, end: 25, title:'Receive Packet', text:'Incoming TCP packet' },
+  { trackId: 2, start: 10, end: 35, title:'Check Rules', text:'Firewall rule evaluation' },
+  { trackId: 3, start: 20, end: 60, title:'Read Log', text:'Disk read for logging' },
+  { trackId: 1, start: 30, end: 55, title:'Decrypt Packet', text:'AES decryption' },
+  { trackId: 4, start: 50, end: 80, title:'Monitor Traffic', text:'Analyze network metrics' },
+  { trackId: 2, start: 40, end: 90, title:'Block Malicious', text:'Drop suspicious packets' },
+  { trackId: 3, start: 85, end: 110, title:'Write Logs', text:'Flush events to disk' },
+  { trackId: 1, start: 100, end: 130, title:'Process Packet', text:'Routing decision' },
+  { trackId: 2, start: 120, end: 150, title:'Update Rules', text:'Dynamic firewall update' },
+  { trackId: 4, start: 140, end: 180, title:'Alert Generation', text:'Notify admin of anomalies' }
+];
+
+// Precompute _start/_end
+events.forEach(e => {
+  e._start = Number(e.start);
+  e._end = Number(e.end != null ? e.end : e.start);
+});
+
+const pxPerUnitBase = 4;
+let pxPerUnit = pxPerUnitBase;
+const topPadding = 20;
+const bottomPadding = 20;
+
+let draggedEvent = null;
+let dragOffsetY = 0;
+let currentHoverCol = null; // track we're hovering over during drag
+
+const tracksHeader = document.getElementById('tracksHeader');
+const tracksGrid = document.getElementById('tracksGrid');
+const timeAxis = document.getElementById('timeAxis');
+
+let minT = Math.min(...events.map(e=>e._start));
+let maxT = Math.max(...events.map(e=>e._end));
+let pad = (maxT-minT)*0.04 || 10;
+// minT -= pad; maxT += pad;
+maxT += pad;
+
+let totalUnits = maxT - minT;
+let timelineHeight = totalUnits * pxPerUnit;
+
+// --- Debug logging ---
+console.log("=== timeline range ===");
+console.log("Raw min _start:", Math.min(...events.map(e => e._start)));
+console.log("Raw max _end:", Math.max(...events.map(e => e._end)));
+console.log("minT after pad:", minT);
+console.log("maxT after pad:", maxT);
+console.log("=====================");
+
+function buildTracks(){
+  tracksHeader.innerHTML = '';
+
+  // --- Track titles with edit/delete buttons ---
+  tracks.forEach((track, index) => {
+    const th = document.createElement('div');
+    th.className = 'track-title';
+    th.style.minWidth = '200px';
+    th.style.position = 'relative';
+    th.textContent = track.name;
+
+    const btnContainer = document.createElement('div');
+    btnContainer.style.position = 'absolute';
+    btnContainer.style.right = '6px';
+    btnContainer.style.top = '50%';
+    btnContainer.style.transform = 'translateY(-50%)';
+    btnContainer.style.display = 'none';
+    btnContainer.style.gap = '4px';
+
+    // Edit
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn';
+    editBtn.title = 'Edit Track';
+    editBtn.style.padding = '4px';
+    editBtn.innerHTML = '<i class="fas fa-pen"></i>';
+    editBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const newName = prompt('Track name:', track.name);
+      if(newName){
+        track.name = newName; // just update the name, trackId stays the same
+        buildTracks();
+      }
+    });
+
+    // Delete
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn';
+    deleteBtn.title = 'Delete Track';
+    deleteBtn.style.padding = '4px';
+    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if(confirm(`Delete track "${track.name}"?`)){
+        tracks.splice(index,1);
+        // Remove events with this trackId
+        for(let i = events.length - 1; i >= 0; i--){
+          if(events[i].trackId === track.id) events.splice(i,1);
+        }
+        buildTracks();
+      }
+    });
+
+    btnContainer.appendChild(editBtn);
+    btnContainer.appendChild(deleteBtn);
+    th.appendChild(btnContainer);
+
+    th.addEventListener('mouseenter', () => btnContainer.style.display = 'flex');
+    th.addEventListener('mouseleave', () => btnContainer.style.display = 'none');
+
+    tracksHeader.appendChild(th);
+  });
+
+  // --- Add Track button ---
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn';
+  addBtn.id = 'addTrackBtn';
+  addBtn.title = 'Add Track';
+  addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+  addBtn.style.width = '40px';
+  addBtn.style.height = '40px';
+  addBtn.style.padding = '6px';
+  addBtn.style.fontSize = '14px';
+  tracksHeader.appendChild(addBtn);
+
+  addBtn.addEventListener('click', () => {
+    const name = prompt('Track name:', 'New Track');
+    if(name){
+      tracks.push({id: nextTrackId++, name});
+      buildTracks();
+    }
+  });
+
+  // --- Build track columns ---
+  tracksGrid.innerHTML = '';
+  tracksGrid.style.gridTemplateColumns = `repeat(${tracks.length},1fr)`;
+  tracksHeader.style.gridTemplateColumns = `repeat(${tracks.length}, 1fr)`;
+  tracks.forEach(track => {
+  const col = document.createElement('div');
+  col.className = 'track-column';
+  col.style.minHeight = timelineHeight + 'px';
+  col.style.position = 'relative';
+  col.style.display = 'flex';
+  col.style.flexDirection = 'column';
+
+  // --- Container for hover buttons ---
+  const hoverContainer = document.createElement('div');
+  hoverContainer.style.position = 'absolute';
+  hoverContainer.style.top = '4px';
+  hoverContainer.style.right = '4px';
+  hoverContainer.style.zIndex = 200;
+  hoverContainer.classList.add('hover-container');
+  hoverContainer.style.gap = '4px';
+
+  // --- Add Event button ---
+  const addEventBtn = document.createElement('button');
+  addEventBtn.className = 'btn';
+  addEventBtn.title = 'Add Event';
+  addEventBtn.style.padding = '4px 6px';
+  addEventBtn.style.fontSize = '12px';
+  addEventBtn.innerHTML = '<i class="fas fa-plus"></i>';
+
+  addEventBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const newEvent = {
+      trackId: track.id,
+      start: 0,
+      end: 20,
+      _start: 0,
+      _end: 20,
+      title: 'New Event',
+      text: ''
+    };
+    events.push(newEvent);
+    renderEvents();
+  });
+
+  hoverContainer.appendChild(addEventBtn);
+  col.appendChild(hoverContainer);
+  
+  const sep = document.createElement('div');
+  sep.className = 'track-separator';
+  col.appendChild(sep);
+
+  // --- Show Add Event button on hover ---
+  col.addEventListener('mouseenter', () => hoverContainer.style.display = 'flex');
+  col.addEventListener('mouseleave', () => hoverContainer.style.display = 'none');
+
+  col.addEventListener('dragover', e => e.preventDefault());
+  col.addEventListener('drop', e => {
+    if(draggedEvent){
+      col.appendChild(draggedEvent.el);
+      const idx = draggedEvent.idx;
+      events[idx].trackId = track.id;
+      draggedEvent = null;
+    }
+  });
+
+  tracksGrid.appendChild(col);
+  });
+
+  renderEvents();
+  renderTimeLabels();
+}
+
+function renderTimeLabels(start = minT, end = maxT, step = 10) {
+  const timeAxis = document.getElementById('timeAxis');
+  const firstCol = tracksGrid.children[0];
+  if (!firstCol) return;
+  const sep = firstCol.querySelector('.track-separator');
+  if (!sep) return;
+
+  // Reset axis (but do NOT lose height later)
+  timeAxis.innerHTML = '<div class="axis-line" id="axisLine"></div>';
+
+  const axisRect = timeAxis.getBoundingClientRect();
+  const sepRect = sep.getBoundingClientRect();
+  const zeroY = sepRect.top - axisRect.top;
+
+  const colHeight = totalUnits * pxPerUnit;
+
+  // Make axis tall enough to show full line
+  timeAxis.style.height = colHeight + 'px';
+
+  // ✅ restore the axis line height
+  const axisLine = timeAxis.querySelector('#axisLine');
+  axisLine.style.position = 'absolute';
+  axisLine.style.top = zeroY + 'px';
+  axisLine.style.height = colHeight + 'px';
+  axisLine.style.left = '80px';
+  axisLine.style.width = '2px';
+  axisLine.style.background = 'linear-gradient(180deg,var(--accent),var(--accent2))';
+
+  for (let t = start; t <= end; t += step) {
+    const frac = (t - start) / totalUnits;
+    const y = zeroY + frac * colHeight;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'time-label';
+    lbl.style.position = 'absolute';
+    lbl.style.top = `${y}px`;
+    lbl.textContent = t;
+
+    timeAxis.appendChild(lbl);
+  }
+}
+
+function showEditEventModal(ev, el) {
+  const modal = document.getElementById('editEventModal');
+  const titleInput = document.getElementById('editEventTitle');
+  const startInput = document.getElementById('editEventStart');
+  const endInput = document.getElementById('editEventEnd');
+  const textInput = document.getElementById('editEventText');
+
+  // Populate inputs with current values
+  titleInput.value = ev.title;
+  startInput.value = ev._start;
+  endInput.value = ev._end;
+  textInput.value = ev.text;
+
+  modal.style.display = 'flex';
+
+  const closeModal = () => {
+    modal.style.display = 'none';
+    saveBtn.removeEventListener('click', saveHandler);
+  };
+
+  document.getElementById('closeEditModal').onclick = closeModal;
+
+  const saveBtn = document.getElementById('saveEditEventBtn');
+
+  const saveHandler = () => {
+    const newTitle = titleInput.value.trim();
+    const newStart = parseFloat(startInput.value);
+    const newEnd = parseFloat(endInput.value);
+    const newText = textInput.value.trim();
+
+    if (isNaN(newStart) || isNaN(newEnd) || newEnd <= newStart) {
+      alert('Invalid start/end times. End must be greater than start.');
+      return;
+    }
+
+    // Update event object
+    ev.title = newTitle;
+    ev._start = newStart;
+    ev._end = newEnd;
+    ev.text = newText;
+
+    // Update DOM
+    const titleDiv = el.querySelector('.title');
+    const metaDiv = el.querySelector('.meta');
+    const textDiv = el.querySelector('.text');
+
+    titleDiv.textContent = newTitle;
+    metaDiv.textContent = `${Math.round(newStart)} → ${Math.round(newEnd)}`;
+    textDiv.textContent = newText;
+
+    // Recalculate position & height
+    totalUnits = maxT - minT;
+    const axisHeight = totalUnits * pxPerUnit;
+    const sepOffsetAbsolute = el.parentElement.querySelector('.track-separator')
+      ? el.parentElement.querySelector('.track-separator').getBoundingClientRect().top -
+        tracksGrid.getBoundingClientRect().top
+      : 0;
+
+    const fracStart = (newStart - minT) / totalUnits;
+    const fracHeight = (newEnd - newStart) / totalUnits;
+    const topInCol = sepOffsetAbsolute + fracStart * axisHeight;
+    const heightInCol = Math.max(18, fracHeight * axisHeight) - 9;
+
+    el.style.top = topInCol + 'px';
+    el.style.height = heightInCol + 'px';
+    el.style.zIndex = 100 + Math.round(topInCol);
+
+    closeModal();
+  };
+
+  saveBtn.addEventListener('click', saveHandler);
+}
+
+function renderEvents() {
+  const cols = Array.from(tracksGrid.children);
+  // Remove existing events
+  cols.forEach(col => col.querySelectorAll('.event').forEach(ev => ev.remove()));
+
+  const firstCol = cols[0];
+  if (!firstCol) return;
+  const sep = firstCol.querySelector('.track-separator');
+  if (!sep) return;
+
+  const sepRect = sep.getBoundingClientRect();
+  const gridRect = tracksGrid.getBoundingClientRect();
+  const sepOffsetAbsolute = sepRect.top - gridRect.top;
+  totalUnits = maxT - minT;
+  const axisHeight = totalUnits * pxPerUnit;
+
+  events.forEach((ev, idx) => {
+    const trackIndex = tracks.findIndex(t => t.id === ev.trackId);
+    if (trackIndex === -1) return;
+    const col = cols[trackIndex];
+
+    const el = document.createElement('div');
+    el.className = 'event';
+    el.dataset.idx = idx;
+
+    // --- Set position & size ---
+    const fracStart = (ev._start - minT) / totalUnits;
+    const fracHeight = (ev._end - ev._start) / totalUnits;
+    const topInCol = sepOffsetAbsolute + fracStart * axisHeight;
+    const heightInCol = Math.max(18, fracHeight * axisHeight) - 9;
+
+    el.style.position = 'absolute';
+    el.style.top = topInCol + 'px';
+    el.style.height = heightInCol + 'px';
+    el.style.left = '8px';
+    el.style.right = '8px';
+    el.style.zIndex = 100 + Math.round(topInCol);
+    // el.style.padding = '1px';
+    // el.style.boxSizing = 'border-box';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.justifyContent = 'flex-start';
+
+    // --- Content ---
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'title';
+    titleDiv.textContent = ev.title;
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'meta';
+    metaDiv.textContent = `${Math.round(ev._start)} → ${Math.round(ev._end)}`;
+    const textDiv = document.createElement('div');
+    textDiv.className = 'text';
+    textDiv.textContent = ev.text;
+
+    el.appendChild(titleDiv);
+    el.appendChild(metaDiv);
+    el.appendChild(textDiv);
+
+    // --- Hover buttons container (2 buttons only) ---
+    const hoverContainer = document.createElement('div');
+    hoverContainer.style.position = 'absolute';
+    hoverContainer.style.top = '4px';
+    hoverContainer.style.right = '4px';
+    hoverContainer.style.display = 'none';
+    hoverContainer.style.gap = '4px';
+    el.appendChild(hoverContainer);
+
+    // --- Edit button ---
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn';
+    editBtn.title = 'Edit Event';
+    editBtn.innerHTML = '<i class="fas fa-pen"></i>';
+    editBtn.style.padding = '2px 4px';
+    editBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      showEditEventModal(ev, el); // open modal for title/meta/text
+    });
+    hoverContainer.appendChild(editBtn);
+
+    // --- Delete button ---
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn';
+    deleteBtn.title = 'Delete Event';
+    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    deleteBtn.style.padding = '2px 4px';
+    deleteBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (confirm(`Delete event "${ev.title}"?`)) {
+        events.splice(idx, 1);
+        el.remove();
+      }
+    });
+    hoverContainer.appendChild(deleteBtn);
+
+    // --- Show hover buttons on hover ---
+    el.addEventListener('mouseenter', () => hoverContainer.style.display = 'flex');
+    el.addEventListener('mouseleave', () => hoverContainer.style.display = 'none');
+
+    // --- Drag handlers ---
+    el.addEventListener('mousedown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
+      draggedEvent = { el, idx: Number(el.dataset.idx) };
+      dragOffsetY = e.clientY - el.getBoundingClientRect().top;
+      document.addEventListener('mousemove', dragMove);
+      document.addEventListener('mouseup', dragEnd);
+      e.preventDefault();
+    });
+
+    col.appendChild(el);
+  });
+}
+
+// --- Drag move ---
+function dragMove(e) {
+  if (!draggedEvent) return;
+
+  const el = draggedEvent.el;
+  const cols = Array.from(tracksGrid.children);
+
+  // Detect which column we're hovering over
+  currentHoverCol = null;
+  for (const col of cols) {
+    const rect = col.getBoundingClientRect();
+    if (e.clientX >= rect.left && e.clientX <= rect.right) {
+      currentHoverCol = col;
+      break;
+    }
+  }
+  if (!currentHoverCol) return;
+
+  const sep = currentHoverCol.querySelector('.track-separator');
+  const sepRect = sep.getBoundingClientRect();
+  const gridRect = tracksGrid.getBoundingClientRect();
+  const sepOffsetAbsolute = sepRect.top - gridRect.top; // fixed reference
+  let newTopAbsolute = e.clientY - dragOffsetY - gridRect.top; // relative to grid
+  newTopAbsolute = Math.max(sepOffsetAbsolute, newTopAbsolute);
+
+  const axisHeight = totalUnits * pxPerUnit;
+  // Clamp inside column using the absolute separator offset
+  const maxTop = sepOffsetAbsolute + axisHeight - el.offsetHeight;
+  newTopAbsolute = Math.max(sepOffsetAbsolute, Math.min(maxTop, newTopAbsolute));
+
+  el.style.top = newTopAbsolute + 'px';
+
+  const startUnits = ((newTopAbsolute - sepOffsetAbsolute) / axisHeight) * totalUnits + minT;
+  const duration = events[draggedEvent.idx]._end - events[draggedEvent.idx]._start;
+
+  events[draggedEvent.idx]._start = startUnits;
+  events[draggedEvent.idx]._end = startUnits + duration;
+
+  el.querySelector('.meta').textContent =
+    Math.round(startUnits) + ' → ' + Math.round(startUnits + duration);
+
+  // --- Debug logging ---
+  console.log(`Dragging idx=${draggedEvent.idx}`);
+  console.log(`  mouseY: ${e.clientY}, dragOffsetY: ${dragOffsetY}`);
+  console.log(`  newTopAbsolute: ${newTopAbsolute}`);
+  console.log(`  startUnits: ${startUnits.toFixed(2)}, duration: ${duration.toFixed(2)}`);
+  console.log(`  visual top in col: ${newTopAbsolute}, height: ${el.offsetHeight}`);
+
+  // Log other events on same track for overlap diagnosis
+  const trackIndex = tracks.findIndex(t => t.id === events[draggedEvent.idx].trackId);
+  const colEvents = Array.from(currentHoverCol.querySelectorAll('.event'))
+    .map(ev => ({ el: ev, idx: Number(ev.dataset.idx) }))
+    .sort((a, b) => events[a.idx]._start - events[b.idx]._start);
+
+  colEvents.forEach(({ el: evEl, idx }) => {
+    console.log(`  Track event idx=${idx}, _start=${events[idx]._start.toFixed(2)}, _end=${events[idx]._end.toFixed(2)}, top=${evEl.offsetTop}, height=${evEl.offsetHeight}`);
+  });
+}
+
+// --- Drag end ---
+function dragEnd(e) {
+  document.removeEventListener('mousemove', dragMove);
+  document.removeEventListener('mouseup', dragEnd);
+
+  if (draggedEvent && currentHoverCol) {
+    // Append event to new column
+    currentHoverCol.appendChild(draggedEvent.el);
+
+    // Update event's trackId
+    const colIndex = Array.from(tracksGrid.children).indexOf(currentHoverCol);
+    events[draggedEvent.idx].trackId = tracks[colIndex].id;
+  }
+
+  draggedEvent = null;
+  currentHoverCol = null;
+}
+
+// zoom
+document.getElementById('zoomIn').addEventListener('click', ()=>{
+  pxPerUnit=Math.min(20, pxPerUnit*1.3);
+  buildTracks();
+});
+document.getElementById('zoomOut').addEventListener('click', ()=>{
+  pxPerUnit=Math.max(0.4, pxPerUnit/1.3);
+  buildTracks();
+});
+document.getElementById('resetZoom').addEventListener('click', ()=>{
+  pxPerUnit=pxPerUnitBase;
+  buildTracks();
+});
+
+const modal = document.getElementById('timeLabelsModal');
+const btnOpen = document.getElementById('setTimeLabels');
+const btnApply = document.getElementById('timeLabelsApply');
+const btnCancel = document.getElementById('timeLabelsCancel');
+
+function updateTracksHeight() {
+  const tracksGrid = document.getElementById('tracksGrid');
+  tracksGrid.style.height = timelineHeight + 'px';
+
+  document.querySelectorAll('.track-column').forEach(col => {
+    col.style.height = timelineHeight + 'px';
+  });
+}
+
+function updateTimelineRange(start, end, step) {
+  minT = start;
+  maxT = end + pad;
+
+  totalUnits = maxT - minT;
+  const timelineHeight = totalUnits * pxPerUnit;
+
+  // 1. Resize tracks view & columns
+  const tracksView = document.getElementById('tracksView');
+  tracksView.style.height = timelineHeight + 'px';
+
+  document.getElementById('tracksGrid').style.height = timelineHeight + 'px';
+  document.querySelectorAll('.track-col').forEach(col => {
+    col.style.height = timelineHeight + 'px';
+  });
+
+  // 2. Rebuild the time axis
+  const axis = document.getElementById('timeAxis');
+  axis.innerHTML = '<div class="axis-line" id="axisLine"></div>';
+  axis.style.height = timelineHeight + 'px';
+
+  const firstCol = tracksGrid.children[0];
+  if (!firstCol) return;
+
+  const sep = firstCol.querySelector('.track-separator');
+  const axisRect = axis.getBoundingClientRect();
+  const sepRect = sep.getBoundingClientRect();
+  const zeroY = sepRect.top - axisRect.top;
+
+  // 3. Update axis-line position & height
+  const axisLine = document.getElementById('axisLine');
+  axisLine.style.top = zeroY + 'px';
+  axisLine.style.height = timelineHeight + 'px';
+
+  // 4. Add labels
+  for (let t = start; t <= end; t += step) {
+    const frac = (t - minT) / totalUnits;
+    const y = zeroY + frac * timelineHeight;
+
+    const lbl = document.createElement('div');
+    lbl.className = 'time-label';
+    lbl.textContent = t;
+    lbl.style.position = 'absolute';
+    lbl.style.top = `${y}px`;
+    axis.appendChild(lbl);
+  }
+
+  // 5. Ensure page is tall enough
+  document.body.style.minHeight = (timelineHeight + 200) + 'px';
+}
+
+btnOpen.addEventListener('click', () => {
+  modal.style.display = 'flex';
+});
+
+btnCancel.addEventListener('click', () => {
+  modal.style.display = 'none';
+});
+
+btnApply.addEventListener('click', () => {
+  const start = parseFloat(document.getElementById('timeStart').value);
+  const end = parseFloat(document.getElementById('timeEnd').value);
+  const step = parseFloat(document.getElementById('timeStep').value);
+
+  if (isNaN(start) || isNaN(end) || isNaN(step) || step <= 0) {
+    alert("Please enter valid numbers.");
+    return;
+  }
+
+  pad = (end- start) * 0.04 || 10;
+  totalUnits = end - start + pad;
+  timelineHeight = totalUnits * pxPerUnit;
+
+  updateTracksHeight();
+  updateTimelineRange(start, end, step);
+  modal.style.display = 'none';
+});
+
+buildTracks();
+</script>
+</body>
+</html>
