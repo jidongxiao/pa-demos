@@ -222,6 +222,11 @@ body {
     </label>
 
     <label>
+      Color
+      <input type="color" id="editEventColor">
+    </label>
+
+    <label>
       Text
       <textarea id="editEventText" rows="3"></textarea>
     </label>
@@ -516,12 +521,14 @@ function showEditEventModal(ev, el) {
   const titleInput = document.getElementById('editEventTitle');
   const startInput = document.getElementById('editEventStart');
   const endInput = document.getElementById('editEventEnd');
+  const colorInput = document.getElementById('editEventColor')
   const textInput = document.getElementById('editEventText');
 
   // Populate inputs with current values
   titleInput.value = ev.title;
   startInput.value = ev._start;
   endInput.value = ev._end;
+  colorInput.value = ev.color || "#7c3aed";
   textInput.value = ev.text;
 
   modal.style.display = 'flex';
@@ -539,6 +546,7 @@ function showEditEventModal(ev, el) {
     const newTitle = titleInput.value.trim();
     const newStart = parseFloat(startInput.value);
     const newEnd = parseFloat(endInput.value);
+    const newColor = colorInput.value;
     const newText = textInput.value.trim();
 
     if (isNaN(newStart) || isNaN(newEnd) || newEnd <= newStart) {
@@ -550,6 +558,7 @@ function showEditEventModal(ev, el) {
     ev.title = newTitle;
     ev._start = newStart;
     ev._end = newEnd;
+    ev.color = newColor
     ev.text = newText;
 
     // Update DOM
@@ -577,6 +586,7 @@ function showEditEventModal(ev, el) {
     el.style.top = topInCol + 'px';
     el.style.height = heightInCol + 'px';
     el.style.zIndex = 100 + Math.round(topInCol);
+    el.style.background = `linear-gradient(to bottom, ${newColor}33, ${newColor}1a)`;
 
     closeModal();
   };
@@ -626,6 +636,11 @@ function renderEvents() {
     el.style.display = 'flex';
     el.style.flexDirection = 'column';
     el.style.justifyContent = 'flex-start';
+
+    // --- Set Color ---
+    if (ev.color) {
+      el.style.background = `linear-gradient(to bottom, ${ev.color}33, ${ev.color}1a)`;
+    }
 
     // --- Content ---
     const titleDiv = document.createElement('div');
