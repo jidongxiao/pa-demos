@@ -223,7 +223,8 @@ body {
 
     <label>
       Color
-      <input type="color" id="editEventColor">
+        <input type="color" id="editEventColor">
+          <button type="button" class="btn" id="resetEventColorBtn" style="font-size: 11px;">ResetColor</button>
     </label>
 
     <label>
@@ -521,7 +522,8 @@ function showEditEventModal(ev, el) {
   const titleInput = document.getElementById('editEventTitle');
   const startInput = document.getElementById('editEventStart');
   const endInput = document.getElementById('editEventEnd');
-  const colorInput = document.getElementById('editEventColor')
+  const colorInput = document.getElementById('editEventColor');
+  const resetColorBtn = document.getElementById('resetEventColorBtn');
   const textInput = document.getElementById('editEventText');
 
   // Populate inputs with current values
@@ -532,6 +534,18 @@ function showEditEventModal(ev, el) {
   textInput.value = ev.text;
 
   modal.style.display = 'flex';
+
+  //Update Color state
+  let currentColor = ev.color || null;
+  colorInput.oninput = () => {
+    currentColor = colorInput.value;
+  };
+
+  //reset Color state to original
+  resetColorBtn.onclick = () => {
+    currentColor = null;
+    colorInput.value = "#7c3aed";
+  };
 
   const closeModal = () => {
     modal.style.display = 'none';
@@ -558,7 +572,7 @@ function showEditEventModal(ev, el) {
     ev.title = newTitle;
     ev._start = newStart;
     ev._end = newEnd;
-    ev.color = newColor
+    ev.color = currentColor;
     ev.text = newText;
 
     // Update DOM
@@ -586,8 +600,12 @@ function showEditEventModal(ev, el) {
     el.style.top = topInCol + 'px';
     el.style.height = heightInCol + 'px';
     el.style.zIndex = 100 + Math.round(topInCol);
-    el.style.background = `linear-gradient(to bottom, ${newColor}33, ${newColor}1a)`;
 
+    if (ev.color) {
+      el.style.background = `linear-gradient(to bottom, ${ev.color}33, ${ev.color}1a)`;
+    } else {
+      el.style.background = '';
+    }
     closeModal();
   };
 
