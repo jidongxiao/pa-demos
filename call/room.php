@@ -49,9 +49,54 @@ $username = $_SESSION['demo_username'] ?? 'Guest';
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
     <style>
-* {
-    box-sizing: border-box;
-}
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            min-width: 220px;
+            max-width: 340px;
+            padding: 0.75rem 1.1rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #f1f5f9;
+            background: #1e293b;
+            border-left: 4px solid #6366f1;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateX(30px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast.success { border-left-color: #22c55e; }
+        .toast.error   { border-left-color: #ef4444; }
+        .toast.warning { border-left-color: #f59e0b; }
+        .toast.info    { border-left-color: #38bdf8; }
+
+        /* On mobile, anchor toasts to the bottom so they don't cover videos */
+        @media (max-width: 768px) {
+            .toast {
+                top: auto;
+                bottom: 90px; /* above the controls bar */
+                right: 50%;
+                transform: translateX(50%) translateY(10px);
+                width: calc(100% - 2rem);
+                max-width: 100%;
+                text-align: center;
+            }
+
+            .toast.show {
+                transform: translateX(50%) translateY(0);
+            }
+        }
 
         body {
             background: #0f172a;
@@ -368,10 +413,51 @@ $username = $_SESSION['demo_username'] ?? 'Guest';
             opacity: 0.7;
         }
 
-        /* Mobile */
-        @media (max-width: 768px) {
+        /* Mobile portrait: stack videos vertically */
+        @media (max-width: 768px) and (orientation: portrait) {
             .video-container {
-                grid-template-columns: 1fr;
+                flex-direction: column;
+                align-items: center;
+                padding: 12px;
+                gap: 12px;
+            }
+
+            .video-tile {
+                width: 100%;
+                max-width: 100%;
+                min-width: unset;
+                flex: none;
+            }
+        }
+
+        /* Mobile landscape: keep side-by-side but tighter */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .video-container {
+                flex-direction: row;
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .video-tile {
+                min-width: unset;
+                flex: 1;
+            }
+
+            /* Shrink header and controls to save vertical space */
+            .room-header {
+                padding: 0.4rem 1rem;
+                font-size: 0.85rem;
+            }
+
+            .controls {
+                padding: 0.5rem;
+                gap: 0.75rem;
+            }
+
+            .control-btn {
+                width: 42px;
+                height: 42px;
+                font-size: 1rem;
             }
         }
     </style>
@@ -493,6 +579,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     ws = window.wsClient;
+
+    ws.on('user_joined', (data) => {
+        const name = data?.user?.username || 'Someone';
+        showToast(`${name} joined the room 👋`, 'success', 4000);
+    });
+
+    ws.on('webrtc_peer_disconnected', () => {
+        showToast('Peer has left the call.', 'info', 5000);
+    });
 
     ws.on('room_joined', (data) => {
         // updateRoomStatus('connected', `Connected to room ${data.room_code}`);
